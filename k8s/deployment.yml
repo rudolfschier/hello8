@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello8-deployment
+  namespace: hello8
+  labels:
+    app: hello8-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hello8-deployment
+  template:
+    metadata:
+      name: hello8-deployment
+      labels:
+        app: hello8-deployment
+    spec:
+      containers:
+        - name: hello8-deployment
+          image: rudolfschier/hello8:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+      restartPolicy: Always
