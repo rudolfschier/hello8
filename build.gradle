@@ -1,0 +1,184 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.1.4'
+    id 'io.spring.dependency-management' version '1.1.3'
+}
+
+group = 'com.k8s'
+version = '1.0'
+
+java {
+    sourceCompatibility = '17'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+/*
+https://stackoverflow.com/questions/41136760/how-to-put-folder-into-a-tar-file-with-gradle
+*/
+task tarz(type: Tar) {
+    archiveFileName = "${project.name}.tar"
+    into ('/'){
+        from 'build/libs'
+        include '**.*'
+    }
+
+    into ('data/config'){
+        from 'data/config'
+        include '*.properties.*'
+
+    }
+}
+
+task dockerLogin(type:Exec) {
+    group "build docker"
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c",'docker login -u="rudolfschier" -p="LaSt3aua$1"'
+}
+
+task dockerPush(type:Exec) {
+    group "build docker"
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","docker push rudolfschier/${project.name}:${project.version}"
+}
+
+task dockerPull(type:Exec) {
+    group "build docker"
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","docker pull rudolfschier/${project.name}:${project.version}"
+}
+
+task dockerRun(type:Exec) {
+    group "build docker"
+//    workingDir 'build'
+    //on windows:
+    def fullname = "${project.name}"+'-'+"${project.version}";
+    commandLine "cmd","/c","docker run    --name \"${fullname}\"     --rm -p 8080:8080 rudolfschier/${project.name} "
+//  commandLine "cmd","/c","docker run -d --name \"${fullname}\" -it -p 8080:8080 rudolfschier/${project.name} "
+}
+
+/*
+https://www.upwork.com/resources/how-to-stop-a-docker-container
+ */
+task dockerStopContainer(type:Exec) {
+    group "build docker"
+    onlyIf {false}
+/*
+skipped because it is not doing anything as it is
+ */
+//    workingDir 'build'
+    //on windows:
+    // we need the container id
+    def containerId = ""
+    commandLine "cmd","/c","docker stop ${containerId}"
+}
+
+task dockerLogout(type:Exec) {
+    group "build docker"
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","docker logout"
+}
+
+task dockerBuild(type:Exec) {
+    group "build docker"
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","docker build -t rudolfschier/${project.name}:${project.version}  -t rudolfschier/${project.name}:latest -f Dockerfile ."
+}
+
+task deleteFiles(type: Delete) {
+    delete fileTree('k8s') {
+        include '**/*.*'
+    }
+    delete fileTree('./') {
+        include 'Dockerfile'
+    }
+}
+
+/*
+https://www.oreilly.com/library/view/gradle-beyond-the/9781449373801/ch01.html
+ */
+task copy_k8s(type: Copy) {
+    dependsOn(deleteFiles)
+    from 'templates-k8s'
+    include '*.*'
+    into 'k8s'
+    expand([
+            "namespace": "${project.name}",
+            "projectname": "${project.name}",
+            "projectversion": "${project.version}",
+            "nodePort": "30008",
+    ])
+}
+
+task copy_docker(type: Copy) {
+    dependsOn(copy_k8s)
+    from "templates-docker"
+    include 'Dockerfile'
+    into "."
+    expand([
+            "projectname": "${project.name}",
+            "projectversion": "${project.version}",
+    ])
+}
+
+processResources{
+    dependsOn(copy_docker)
+}
+compileJava{
+    dependsOn(processResources)
+}
+
+task k8sDeleteDeployment(type:Exec) {
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","kubectl delete deployment ${project.name}-deployment --namespace=${project.name}"
+}
+
+task k8sDeleteNamespace(type:Exec) {
+    dependsOn(k8sDeleteDeployment)
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","kubectl delete namespace ${project.name}"
+}
+task k8sDeleteProject(){
+    group "build k8s"
+    dependsOn(k8sDeleteNamespace)
+}
+
+task k8sDeploy0(type:Exec) {
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","kubectl apply -f k8s/ns.yml"
+}
+task k8sDeploy1(type:Exec) {
+    dependsOn(k8sDeploy0)
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","kubectl apply -f k8s/deployment.yml"
+}
+task k8sDeploy(type:Exec) {
+    dependsOn(k8sDeploy1)
+//    workingDir 'build'
+    //on windows:
+    commandLine "cmd","/c","kubectl apply -f k8s/service.yml"
+}
+task k8sDeployProject(){
+    group "build k8s"
+    dependsOn(k8sDeploy)
+}

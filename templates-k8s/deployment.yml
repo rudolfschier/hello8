@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${projectname}-deployment
+  namespace: ${namespace}
+  labels:
+    app: ${projectname}-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ${projectname}-deployment
+  template:
+    metadata:
+      name: ${namespace}-deployment
+      labels:
+        app: ${projectname}-deployment
+    spec:
+      containers:
+        - name: ${projectname}-deployment
+          image: rudolfschier/${projectname}:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+      restartPolicy: Always
